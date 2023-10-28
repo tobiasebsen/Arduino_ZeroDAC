@@ -139,6 +139,8 @@ uint8_t Arduino_ZeroDAC::getChannels() {
 	return 1;
 #elif defined(__SAMD51__)
 	return 2;
+#else
+    return 0;
 #endif
 }
 
@@ -147,6 +149,8 @@ uint8_t Arduino_ZeroDAC::getBits() {
 	return 10;
 #elif defined(__SAMD51__)
 	return 12;
+#else
+    return 0;
 #endif
 }
 
@@ -155,15 +159,19 @@ void* Arduino_ZeroDAC::getDataRegister() {
 	return (void*)&DAC->DATA.reg;
 #elif defined(__SAMD51__)
 	return (void*)&DAC->DATA[0].reg;
+#else
+    return 0;
 #endif
 }
 
 uint8_t Arduino_ZeroDAC::getDmaBeatSize() {
-	#if defined(__SAMD21__)
+#if defined(__SAMD21__)
 	return DMAC_BTCTRL_BEATSIZE_HWORD_Val;
-	#elif defined(__SAMD51__)
+#elif defined(__SAMD51__)
 	return DMAC_BTCTRL_BEATSIZE_WORD_Val;
-	#endif
+#else
+    return 0;
+#endif
 }
 
 void Arduino_ZeroDAC::startTimer(uint16_t sample_rate) {
@@ -238,9 +246,11 @@ void Arduino_ZeroDAC::startTimer(uint16_t sample_rate) {
 }
 
 uint8_t Arduino_ZeroDAC::getTimerTrigger() {
-	#if defined(__SAMD21__)
+#if defined(__SAMD21__)
 	return TC5_DMAC_ID_OVF;
-	#elif defined(__SAMD51__)
+#elif defined(__SAMD51__)
 	return TC2_DMAC_ID_OVF;
-	#endif
+#else
+    return 0;
+#endif
 }
