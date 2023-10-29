@@ -19,6 +19,27 @@
  */
 
 #include "Arduino_ZeroDAC.h"
+#include "wiring_private.h"
+
+#if defined(__SAMD21__)
+const uint8_t Arduino_ZeroDAC::channels = 1;
+const uint8_t Arduino_ZeroDAC::bits     = 10;
+const void*   Arduino_ZeroDAC::data     = (const void*)(&DAC->DATA.reg);
+const uint8_t Arduino_ZeroDAC::beat_size= DMAC_BTCTRL_BEATSIZE_HWORD_Val;
+const uint8_t Arduino_ZeroDAC::trigger  = TC5_DMAC_ID_OVF;
+#elif defined(__SAMD51__)
+const uint8_t Arduino_ZeroDAC::channels = 2;
+const uint8_t Arduino_ZeroDAC::bits     = 12;
+const void*   Arduino_ZeroDAC::data     = (const void*)(&DAC->DATA[0].reg);
+const uint8_t Arduino_ZeroDAC::beat_size= DMAC_BTCTRL_BEATSIZE_WORD_Val;
+const uint8_t Arduino_ZeroDAC::trigger  = TC2_DMAC_ID_OVF;
+#else
+const uint8_t Arduino_ZeroDAC::channels = 0;
+const uint8_t Arduino_ZeroDAC::bits     = 0;
+const void*   Arduino_ZeroDAC::data     = (const void*)0;
+const uint8_t Arduino_ZeroDAC::beat_size= 0;
+const uint8_t Arduino_ZeroDAC::trigger  = 0;
+#endif
 
 
 /**************************************************************************/
@@ -74,7 +95,11 @@ void Arduino_ZeroDAC::begin(DACVRef vref) {
     DAC->CTRLA.reg = DAC_CTRLA_ENABLE;
     while (DAC->STATUS.bit.SYNCBUSY);
 
-#elif defined(__SAMD51__)
+#endif
+#if defined(__SAMD51__)
+
+	pinPeripheral(PIN_DAC0, PIO_ANALOG);
+	pinPeripheral(PIN_DAC1, PIO_ANALOG);
 
     // Control A //
 
@@ -82,8 +107,8 @@ void Arduino_ZeroDAC::begin(DACVRef vref) {
     DAC->CTRLA.reg = DAC_CTRLA_SWRST;
     while (DAC->SYNCBUSY.bit.ENABLE || DAC->SYNCBUSY.bit.SWRST);
 
-    // Enable
-    DAC->CTRLA.reg = DAC_CTRLA_ENABLE;
+    // Disable
+    DAC->CTRLA.bit.ENABLE = 0;
     while (DAC->SYNCBUSY.bit.ENABLE || DAC->SYNCBUSY.bit.SWRST);
 
     // Control B //
@@ -102,7 +127,7 @@ void Arduino_ZeroDAC::begin(DACVRef vref) {
     while (DAC->SYNCBUSY.bit.ENABLE || DAC->SYNCBUSY.bit.SWRST);
 
     // Event Control
-    DAC->EVCTRL.reg = DAC_EVCTRL_STARTEI0 | DAC_EVCTRL_STARTEI1 | DAC_EVCTRL_EMPTYEO0 | DAC_EVCTRL_EMPTYEO1;
+    DAC->EVCTRL.reg = 0;
     while (DAC->SYNCBUSY.bit.ENABLE || DAC->SYNCBUSY.bit.SWRST);
 
     // Setup interrupts
@@ -118,7 +143,7 @@ void Arduino_ZeroDAC::begin(DACVRef vref) {
 	while (DAC->SYNCBUSY.bit.ENABLE || DAC->SYNCBUSY.bit.SWRST);
 
     // Enable
-    DAC->CTRLA.reg = DAC_CTRLA_ENABLE;
+    DAC->CTRLA.reg |= DAC_CTRLA_ENABLE;
     while (DAC->SYNCBUSY.bit.ENABLE || DAC->SYNCBUSY.bit.SWRST);
 
 #endif
@@ -128,49 +153,11 @@ void Arduino_ZeroDAC::write(uint16_t data) {
 #if defined(__SAMD21__)
 	while (DAC->STATUS.bit.SYNCBUSY);
 	DAC->DATA.reg = data;
-#elif defined(__SAMD51__)
+#endif
+#if defined(__SAMD51__)
+
 	while (DAC->SYNCBUSY.bit.ENABLE || DAC->SYNCBUSY.bit.SWRST);
 	DAC->DATA[0].reg = data;
-#endif
-}
-
-uint8_t Arduino_ZeroDAC::getChannels() {
-#if defined(__SAMD21__)
-	return 1;
-#elif defined(__SAMD51__)
-	return 2;
-#else
-    return 0;
-#endif
-}
-
-uint8_t Arduino_ZeroDAC::getBits() {
-#if defined(__SAMD21__)
-	return 10;
-#elif defined(__SAMD51__)
-	return 12;
-#else
-    return 0;
-#endif
-}
-
-void* Arduino_ZeroDAC::getDataRegister() {
-#if defined(__SAMD21__)
-	return (void*)&DAC->DATA.reg;
-#elif defined(__SAMD51__)
-	return (void*)&DAC->DATA[0].reg;
-#else
-    return 0;
-#endif
-}
-
-uint8_t Arduino_ZeroDAC::getDmaBeatSize() {
-#if defined(__SAMD21__)
-	return DMAC_BTCTRL_BEATSIZE_HWORD_Val;
-#elif defined(__SAMD51__)
-	return DMAC_BTCTRL_BEATSIZE_WORD_Val;
-#else
-    return 0;
 #endif
 }
 
@@ -182,7 +169,7 @@ void Arduino_ZeroDAC::startTimer(uint16_t sample_rate) {
         (uint16_t)(GCLK_CLKCTRL_CLKEN |
         GCLK_CLKCTRL_GEN_GCLK0 |
         GCLK_CLKCTRL_ID(GCM_TC4_TC5));
-    while(GCLK->STATUS.bit.SYNCBUSY);
+    while (GCLK->STATUS.bit.SYNCBUSY);
 
     // Power Manager: enable Timer/Counter
     PM->APBCMASK.reg |= PM_APBCMASK_TC5;
@@ -194,14 +181,14 @@ void Arduino_ZeroDAC::startTimer(uint16_t sample_rate) {
 
     // Disable
     TC5->COUNT16.CTRLA.reg &= ~TC_CTRLA_ENABLE;
-    while(TC5->COUNT16.STATUS.bit.SYNCBUSY);
+    while (TC5->COUNT16.STATUS.bit.SYNCBUSY);
 
     // Configure Control A
     TC5->COUNT16.CTRLA.reg =
         TC_CTRLA_MODE_COUNT16 |     // 16-bit counter mode
         TC_CTRLA_WAVEGEN_MFRQ |     // Match Frequency mode
         TC_CTRLA_PRESCALER_DIV1;    // 1:1 Prescale
-    while(TC5->COUNT16.STATUS.bit.SYNCBUSY);
+    while (TC5->COUNT16.STATUS.bit.SYNCBUSY);
 
     TC5->COUNT16.CTRLBCLR.reg = TC_CTRLBCLR_MASK;
 
@@ -211,13 +198,15 @@ void Arduino_ZeroDAC::startTimer(uint16_t sample_rate) {
 
     // Enable
     TC5->COUNT16.CTRLA.reg |= TC_CTRLA_ENABLE;
-    while(TC5->COUNT16.STATUS.bit.SYNCBUSY);
+    while (TC5->COUNT16.STATUS.bit.SYNCBUSY);
 
-#elif defined(__SAMD51__)
+#endif
+#if defined(__SAMD51__)
 
     // Generic Clock
+    //while ((GCLK->SYNCBUSY.reg & GCLK_SYNCBUSY_GENCTRL2));
     GCLK->PCHCTRL[TC2_GCLK_ID].reg = GCLK_PCHCTRL_CHEN | GCLK_PCHCTRL_GEN_GCLK2;
-    while (!(GCLK->PCHCTRL[TC2_GCLK_ID].reg & GCLK_PCHCTRL_CHEN));
+    //while (!(GCLK->PCHCTRL[TC2_GCLK_ID].reg & GCLK_PCHCTRL_CHEN));
 
     TC2->COUNT8.WAVE.reg = TC_WAVE_WAVEGEN_NFRQ;
 
@@ -245,12 +234,3 @@ void Arduino_ZeroDAC::startTimer(uint16_t sample_rate) {
 #endif
 }
 
-uint8_t Arduino_ZeroDAC::getTimerTrigger() {
-#if defined(__SAMD21__)
-	return TC5_DMAC_ID_OVF;
-#elif defined(__SAMD51__)
-	return TC2_DMAC_ID_OVF;
-#else
-    return 0;
-#endif
-}

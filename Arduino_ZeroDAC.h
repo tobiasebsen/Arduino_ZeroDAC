@@ -40,15 +40,15 @@ public:
   void write(uint16_t data);
   void write(uint16_t data0, uint16_t data1);
 
-  uint8_t getChannels();
-  uint8_t getBits();
-  void* getDataRegister();
-  uint8_t getDmaBeatSize();
-
   void startTimer(uint16_t sample_rate);
   void setTimer(uint16_t sample_rate);
-  uint8_t getTimerTrigger();
   void stopTimer();
+
+  static const uint8_t channels;
+  static const uint8_t bits;
+  static const void* data;
+  static const uint8_t trigger;
+  static const uint8_t beat_size;
 };
 
 #endif
