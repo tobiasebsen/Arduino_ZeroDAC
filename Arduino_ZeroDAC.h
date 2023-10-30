@@ -21,9 +21,9 @@
 */
 /**************************************************************************/
 typedef enum _DACVRef {
-  DAC_REFSEL_INT1V,   // Internal 1V reference
-  DAC_REFSEL_AVCC,    // Analog supply reference
-  DAC_REFSEL_VREF     // External reference
+  DAC_REFSEL_INT1V, // Internal 1V reference
+  DAC_REFSEL_AVCC,  // Analog supply reference
+  DAC_REFSEL_VREF   // External reference
 } DACVRef;
 
 /**************************************************************************/
@@ -34,7 +34,6 @@ typedef enum _DACVRef {
 /**************************************************************************/
 class Arduino_ZeroDAC {
 public:
-
   void begin(DACVRef vref);
 
   void write(uint16_t data);
@@ -46,7 +45,7 @@ public:
 
   static const uint8_t channels;
   static const uint8_t bits;
-  static const void* data;
+  static const void *data;
   static const uint8_t trigger;
   static const uint8_t beat_size;
 };
